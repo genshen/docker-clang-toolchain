@@ -19,9 +19,6 @@ ARG LIBUNWIND_INSTALL_PATH=/usr/local/libunwind
 ARG LIBCXXABI_INSTALL_PATH=/usr/local/libcxxabi
 ARG LIBCXX_INSTALL_PATH=/usr/local/libcxx
 
-# number of cpus to build
-ENV BUILDERS=24
-
 RUN mkdir -p /usr/local/lib /usr/local/bin /usr/local/include
 
 # build libunwind
@@ -53,7 +50,7 @@ RUN cd ${LLVM_SRC_DIR}/libcxxabi \
 
 ## build libcxx
 RUN cd ${LLVM_SRC_DIR}/libcxx \
-    && cmake -B./build -H./  \
+    && cmake -B./build -H./ -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${LIBCXX_INSTALL_PATH} \
         -DLIBCXX_ENABLE_SHARED=ON -DLIBCXX_ENABLE_STATIC=ON  \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
@@ -62,7 +59,7 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
         -DLIBCXX_CXX_ABI=libcxxabi \
         -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \
         -DLLVM_PATH=../llvm \
-    && cmake --build ./build --target install -j ${BUILDERS} \
+    && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../ \
     && ln -s ${LIBCXX_INSTALL_PATH}/lib/* /usr/local/lib/ \
@@ -71,6 +68,9 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
 ## build clang with compiler-rt, libcxx and libunwind support, 
 # but clang/clang++ binary is still linked to GNU libs.
 FROM cxx_runtime AS compiler-rt
+
+ARG CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/9.0.0
+ARG CLANG_INSTALL_PATH=/usr/local/clang/
 
 # todo set clang install dir in ARG(no '9.0.0').
 RUN cd ${LLVM_SRC_DIR}/ \
@@ -86,12 +86,8 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_UNWINDLIB=libunwind \
         -DCLANG_DEFAULT_RTLIB=compiler-rt \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-pc-linux-musl \
-    && cmake --build ./llvm-build-with-compiler-rt --target install -j ${BUILDERS} \
+    && cmake --build ./llvm-build-with-compiler-rt --target install \
     && rm llvm-build-with-compiler-rt -rf
-
-# todo move to front.
-ARG CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/9.0.0
-ARG CLANG_INSTALL_PATH=/usr/local/clang/
 
 
 # build new clang with old clang,
@@ -111,7 +107,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_UNWINDLIB=libunwind \
         -DCLANG_DEFAULT_RTLIB=compiler-rt \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-pc-linux-musl  \
-    && cmake --build ./llvm-build-with-compiler-rt --target install -j ${BUILDERS} \
+    && cmake --build ./llvm-build-with-compiler-rt --target install \
     && rm -rf llvm-build-with-compiler-rt
 
 FROM alpine:latest AS clang-toolchain
