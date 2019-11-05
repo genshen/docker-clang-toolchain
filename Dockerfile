@@ -74,7 +74,7 @@ ARG CLANG_INSTALL_PATH=/usr/local/clang/
 
 # todo set clang install dir in ARG(no '9.0.0').
 RUN cd ${LLVM_SRC_DIR}/ \
-    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=Release -G Ninja \
+    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr/local/clang-gnu/9.0.0 \
         -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
         -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
@@ -95,7 +95,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
 RUN cd ${LLVM_SRC_DIR}/ \
     && export CC=${CLANG_GNU_INSTALL_PATH}/bin/clang  \
     && export CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++  \
-    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=Release -G Ninja \
+    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${CLANG_INSTALL_PATH} \
         -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
         -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
