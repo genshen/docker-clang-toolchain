@@ -115,9 +115,6 @@ FROM alpine:latest AS clang-toolchain
 LABEL maintainer="genshen genshenchu@gmail.com" \
     description="clang/clang++ toolchain without gnu."
 
-ARG USER=user
-ENV WORKDIR="/project"
-
 COPY --from=cxx_runtime /usr/local/libunwind /usr/local/libunwind
 COPY --from=cxx_runtime /usr/local/libcxxabi /usr/local/libcxxabi
 COPY --from=cxx_runtime /usr/local/libcxx /usr/local/libcxx
@@ -132,11 +129,7 @@ RUN mkdir mkdir -p /usr/local/lib /usr/local/bin /usr/local/include \
     && ln -s /usr/local/libcxx/include/*  /usr/local/include/ \
     && ln -s /usr/local/clang/bin/clang /usr/local/bin/clang  \
     && ln -s /usr/local/clang/bin/clang++ /usr/local/bin/clang++ \
-    && apk add --no-cache musl-dev binutils sudo \
-    && adduser -D ${USER} \
-    && echo "${USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
-    && mkdir -p ${WORKDIR} \
-    && chown -R ${USER}:${USER} ${WORKDIR}
+    && apk add --no-cache musl-dev binutils \
+    && mkdir -p /project
 
-WORKDIR ${WORKDIR}
-USER ${USER}
+WORKDIR /project
