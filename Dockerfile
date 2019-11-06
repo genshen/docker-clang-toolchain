@@ -98,6 +98,8 @@ RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${CLANG_INSTALL_PATH} \
         -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+        -DBUILD_SHARED_LIBS=ON \
+        -DLLVM_ENABLE_LIBCXX=ON \
         -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
         -DCOMPILER_RT_BUILD_PROFILE=OFF \
