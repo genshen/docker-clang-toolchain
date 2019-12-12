@@ -129,8 +129,7 @@ RUN mkdir mkdir -p /usr/local/lib /usr/local/bin /usr/local/include \
     && ln -s /usr/local/libcxxabi/lib/*  /usr/local/lib/ \
     && ln -s /usr/local/libcxx/lib/*  /usr/local/lib/ \
     && ln -s /usr/local/libcxx/include/*  /usr/local/include/ \
-    && ln -s /usr/local/clang/bin/clang /usr/local/bin/clang  \
-    && ln -s /usr/local/clang/bin/clang++ /usr/local/bin/clang++ \
+    && ln -s /usr/local/clang/bin/* /usr/local/bin/  \
     && apk add --no-cache musl-dev binutils \
     && mkdir -p /project
 
