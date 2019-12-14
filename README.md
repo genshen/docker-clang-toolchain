@@ -21,3 +21,8 @@ docker run -it --rm -v ${PWD}:/project genshen/clang-toolchain:9.0.0 ldd ./a.out
 	libc++abi.so.1 => /usr/local/lib/libc++abi.so.1 (0x7fc960c67000)
 	libc.musl-x86_64.so.1 => /lib/ld-musl-x86_64.so.1 (0x7fc960e6f000)
 ```
+
+### static link
+```bash
+clang++ main.cpp -static -lc++ -lc++abi -o main
+```

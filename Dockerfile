@@ -13,17 +13,98 @@ RUN wget ${LLVM_DOWNLOAD_URL} -O /tmp/llvmorg.tar.gz \
     && tar -C ${LLVM_SRC_DIR} --strip-components 1 -zxf /tmp/llvmorg.tar.gz \
     && rm /tmp/llvmorg.tar.gz
 
-FROM builder_env AS cxx_runtime
 
-ARG LIBUNWIND_INSTALL_PATH=/usr/local/libunwind
-ARG LIBCXXABI_INSTALL_PATH=/usr/local/libcxxabi
-ARG LIBCXX_INSTALL_PATH=/usr/local/libcxx
+## build clang with compiler-rt support
+# but clang/clang++ binary is still linked to GNU libs.
+FROM builder_env AS clang-gnu
+
+ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/9.0.0
+ENV LIBUNWIND_GNU_INSTALL_PATH=/usr/local/gun-libunwind
+ENV LIBCXXABI_GNU_INSTALL_PATH=/usr/local/gun-libcxxabi
+ENV LIBCXX_GNU_INSTALL_PATH=/usr/local/gun-libcxx
 
 RUN mkdir -p /usr/local/lib /usr/local/bin /usr/local/include
 
 # build libunwind
 RUN cd ${LLVM_SRC_DIR}/libunwind \
     && cmake -B./build -H./ \
+        -DCMAKE_INSTALL_PREFIX=${LIBUNWIND_GNU_INSTALL_PATH} \
+        -DLIBUNWIND_ENABLE_SHARED=OFF \
+        -DLLVM_PATH=../llvm \
+        -DCMAKE_C_FLAGS="-fPIC" \
+        -DCMAKE_CXX_FLAGS="-fPIC" \
+    && cmake --build ./build --target install \
+    && rm build -rf \
+    && cd ../  \
+    && ln -s ${LIBUNWIND_GNU_INSTALL_PATH}/lib/* /usr/local/lib/
+
+## build libc++abi
+RUN cd ${LLVM_SRC_DIR}/libcxxabi \
+    &&  cmake -B./build -H./ \
+        -DCMAKE_INSTALL_PREFIX=${LIBCXXABI_GNU_INSTALL_PATH} \
+        -DLIBCXXABI_ENABLE_STATIC=ON \
+        -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+        -DLIBCXXABI_LIBUNWIND_PATH=../libunwind \
+        -DLIBCXXABI_LIBCXX_INCLUDES=../libcxx/include \
+        -DLLVM_PATH=../llvm \
+    && cmake --build ./build --target install \
+    && rm build -rf \
+    && cd ../  \
+    && ln -s ${LIBCXXABI_GNU_INSTALL_PATH}/lib/* /usr/local/lib/
+
+## build libcxx
+RUN cd ${LLVM_SRC_DIR}/libcxx \
+    &&  cmake -B./build -H./ -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=${LIBCXX_GNU_INSTALL_PATH} \
+        -DLIBCXX_ENABLE_SHARED=ON -DLIBCXX_ENABLE_STATIC=ON  \
+        -DLIBCXX_HAS_MUSL_LIBC=ON \
+        -DLIBCXX_HAS_GCC_S_LIB=OFF \
+        -DCMAKE_SHARED_LINKER_FLAGS="-lunwind" \
+        -DLIBCXX_CXX_ABI=libcxxabi \
+        -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \
+        -DLLVM_PATH=../llvm \
+    && cmake --build ./build --target install \
+    && rm build -rf \
+    && cd ../ \
+    && ln -s ${LIBCXX_GNU_INSTALL_PATH}/lib/* /usr/local/lib/ \
+    && ln -s ${LIBCXX_GNU_INSTALL_PATH}/include/* /usr/local/include/
+
+# todo set clang install dir in ARG(no '9.0.0').
+# clang will be linked to libstdc++ and libgcc (not libcxx,libcxxabi, libunwind)
+RUN cd ${LLVM_SRC_DIR}/ \
+    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=${CLANG_GNU_INSTALL_PATH} \
+        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+        -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+        -DCOMPILER_RT_BUILD_XRAY=OFF \
+        -DCOMPILER_RT_BUILD_PROFILE=OFF \
+        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
+        -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
+        -DCLANG_DEFAULT_UNWINDLIB=libunwind \
+        -DCLANG_DEFAULT_RTLIB=compiler-rt \
+        -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-pc-linux-musl \
+    && cmake --build ./llvm-build-with-compiler-rt --target install \
+    && rm llvm-build-with-compiler-rt -rf
+
+## set cc and cxx compiler.
+ENV CC=${CLANG_GNU_INSTALL_PATH}/bin/clang
+ENV CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++
+
+# COPY  clang-9.0.0-bootstrp-patch.sh ${LLVM_SRC_DIR}/
+# RUN chmod +x clang-9.0.0-bootstrp-patch.sh && ./clang-9.0.0-bootstrp-patch.sh \
+
+# libcxx and libunwind support,
+# bootstrap building (buildiing libunwind, libcxx, libcxxabi using clang)
+FROM clang-gnu AS clang-libs
+
+ARG LIBUNWIND_INSTALL_PATH=/usr/local/libunwind
+ARG LIBCXXABI_INSTALL_PATH=/usr/local/libcxxabi
+ARG LIBCXX_INSTALL_PATH=/usr/local/libcxx
+
+# update libunwind which is compiled by clang
+RUN cd ${LLVM_SRC_DIR}/libunwind \
+    &&  cmake -B./build -H./ \
         -DCMAKE_INSTALL_PREFIX=${LIBUNWIND_INSTALL_PATH} \
         -DLIBUNWIND_ENABLE_SHARED=OFF \
         -DLLVM_PATH=../llvm \
@@ -32,7 +113,7 @@ RUN cd ${LLVM_SRC_DIR}/libunwind \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../  \
-    && ln -s ${LIBUNWIND_INSTALL_PATH}/lib/* /usr/local/lib/
+    && ln -snf ${LIBUNWIND_INSTALL_PATH}/lib/* /usr/local/lib/
 
 ## build libc++abi
 RUN cd ${LLVM_SRC_DIR}/libcxxabi \
@@ -46,11 +127,11 @@ RUN cd ${LLVM_SRC_DIR}/libcxxabi \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../   \
-    && ln -s ${LIBCXXABI_INSTALL_PATH}/lib/* /usr/local/lib/
+    && ln -snf ${LIBCXXABI_INSTALL_PATH}/lib/* /usr/local/lib/
 
 ## build libcxx
 RUN cd ${LLVM_SRC_DIR}/libcxx \
-    && cmake -B./build -H./ -G Ninja \
+    &&  cmake -B./build -H./ -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${LIBCXX_INSTALL_PATH} \
         -DLIBCXX_ENABLE_SHARED=ON -DLIBCXX_ENABLE_STATIC=ON  \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
@@ -62,39 +143,17 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../ \
-    && ln -s ${LIBCXX_INSTALL_PATH}/lib/* /usr/local/lib/ \
-    && ln -s ${LIBCXX_INSTALL_PATH}/include/* /usr/local/include/
+    && ln -snf ${LIBCXX_INSTALL_PATH}/lib/* /usr/local/lib/ \
+    && ln -snf ${LIBCXX_INSTALL_PATH}/include/* /usr/local/include/
 
-## build clang with compiler-rt, libcxx and libunwind support, 
-# but clang/clang++ binary is still linked to GNU libs.
-FROM cxx_runtime AS compiler-rt
+# build new clang with old gnu-clang,
+# the new clang/clang++ binary will not be linked to GNU libs.
+# todo add option of '-DLLVM_ENABLE_FFI'
+FROM clang-libs AS clang-bootstrap
 
-ARG CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/9.0.0
 ARG CLANG_INSTALL_PATH=/usr/local/clang/
 
-# todo set clang install dir in ARG(no '9.0.0').
 RUN cd ${LLVM_SRC_DIR}/ \
-    && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/clang-gnu/9.0.0 \
-        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
-        -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-        -DCOMPILER_RT_BUILD_XRAY=OFF \
-        -DCOMPILER_RT_BUILD_PROFILE=ON \
-        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
-        -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
-        -DCLANG_DEFAULT_UNWINDLIB=libunwind \
-        -DCLANG_DEFAULT_RTLIB=compiler-rt \
-        -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-pc-linux-musl \
-    && cmake --build ./llvm-build-with-compiler-rt --target install \
-    && rm llvm-build-with-compiler-rt -rf
-
-
-# build new clang with old clang,
-# the new clang/clang++ binary will not be linked to GNU libs.
-RUN cd ${LLVM_SRC_DIR}/ \
-    && export CC=${CLANG_GNU_INSTALL_PATH}/bin/clang  \
-    && export CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++  \
     && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${CLANG_INSTALL_PATH} \
         -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
@@ -117,10 +176,10 @@ FROM alpine:latest AS clang-toolchain
 LABEL maintainer="genshen genshenchu@gmail.com" \
     description="clang/clang++ toolchain without gnu."
 
-COPY --from=cxx_runtime /usr/local/libunwind /usr/local/libunwind
-COPY --from=cxx_runtime /usr/local/libcxxabi /usr/local/libcxxabi
-COPY --from=cxx_runtime /usr/local/libcxx /usr/local/libcxx
-COPY --from=compiler-rt /usr/local/clang /usr/local/clang
+COPY --from=clang-bootstrap /usr/local/libunwind /usr/local/libunwind
+COPY --from=clang-bootstrap /usr/local/libcxxabi /usr/local/libcxxabi
+COPY --from=clang-bootstrap /usr/local/libcxx /usr/local/libcxx
+COPY --from=clang-bootstrap /usr/local/clang /usr/local/clang
 
 # make symbolic links
 # musl-dev is used for C lib headers, link stdio.h
