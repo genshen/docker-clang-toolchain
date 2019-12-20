@@ -183,13 +183,13 @@ COPY --from=clang-bootstrap /usr/local/clang /usr/local/clang
 
 # make symbolic links
 # musl-dev is used for C lib headers, link stdio.h
-RUN mkdir mkdir -p /usr/local/lib /usr/local/bin /usr/local/include \
+RUN mkdir -p /usr/local/lib /usr/local/bin /usr/local/include \
     && ln -s /usr/local/libunwind/lib/*  /usr/local/lib/  \
     && ln -s /usr/local/libcxxabi/lib/*  /usr/local/lib/ \
     && ln -s /usr/local/libcxx/lib/*  /usr/local/lib/ \
     && ln -s /usr/local/libcxx/include/*  /usr/local/include/ \
     && ln -s /usr/local/clang/bin/* /usr/local/bin/  \
-    && apk add --no-cache musl-dev binutils \
+    && apk add --no-cache linux-headers musl-dev binutils \
     && mkdir -p /project
 
 WORKDIR /project
