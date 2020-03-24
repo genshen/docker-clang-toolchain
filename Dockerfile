@@ -1,7 +1,7 @@
 FROM alpine:latest AS builder_env
 
 ARG REQUIRE="build-base wget cmake python3 ninja linux-headers"
-ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/archive/llvmorg-9.0.0.tar.gz"
+ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz"
 ENV LLVM_SRC_DIR=/llvm_src
 
 ## install packages and download source.
@@ -18,7 +18,7 @@ RUN wget ${LLVM_DOWNLOAD_URL} -O /tmp/llvmorg.tar.gz \
 # but clang/clang++ binary is still linked to GNU libs.
 FROM builder_env AS clang-gnu
 
-ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/9.0.0
+ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/10.0.0
 ENV LIBUNWIND_GNU_INSTALL_PATH=/usr/local/gun-libunwind
 ENV LIBCXXABI_GNU_INSTALL_PATH=/usr/local/gun-libcxxabi
 ENV LIBCXX_GNU_INSTALL_PATH=/usr/local/gun-libcxx
@@ -29,7 +29,7 @@ RUN mkdir -p /usr/local/lib /usr/local/bin /usr/local/include
 RUN cd ${LLVM_SRC_DIR}/libunwind \
     && cmake -B./build -H./ \
         -DCMAKE_INSTALL_PREFIX=${LIBUNWIND_GNU_INSTALL_PATH} \
-        -DLIBUNWIND_ENABLE_SHARED=OFF \
+        -DLIBUNWIND_ENABLE_SHARED=ON \
         -DLLVM_PATH=../llvm \
         -DCMAKE_C_FLAGS="-fPIC" \
         -DCMAKE_CXX_FLAGS="-fPIC" \
@@ -69,7 +69,7 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
     && ln -s ${LIBCXX_GNU_INSTALL_PATH}/lib/* /usr/local/lib/ \
     && ln -s ${LIBCXX_GNU_INSTALL_PATH}/include/* /usr/local/include/
 
-# todo set clang install dir in ARG(no '9.0.0').
+# todo set clang install dir in ARG(no '10.0.0').
 # clang will be linked to libstdc++ and libgcc (not libcxx,libcxxabi, libunwind)
 RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
@@ -91,8 +91,8 @@ RUN cd ${LLVM_SRC_DIR}/ \
 ENV CC=${CLANG_GNU_INSTALL_PATH}/bin/clang
 ENV CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++
 
-# COPY  clang-9.0.0-bootstrp-patch.sh ${LLVM_SRC_DIR}/
-# RUN chmod +x clang-9.0.0-bootstrp-patch.sh && ./clang-9.0.0-bootstrp-patch.sh \
+# COPY  clang-10.0.0-bootstrp-patch.sh ${LLVM_SRC_DIR}/
+# RUN chmod +x clang-10.0.0-bootstrp-patch.sh && ./clang-10.0.0-bootstrp-patch.sh \
 
 # libcxx and libunwind support,
 # bootstrap building (buildiing libunwind, libcxx, libcxxabi using clang)
@@ -106,7 +106,7 @@ ARG LIBCXX_INSTALL_PATH=/usr/local/libcxx
 RUN cd ${LLVM_SRC_DIR}/libunwind \
     &&  cmake -B./build -H./ \
         -DCMAKE_INSTALL_PREFIX=${LIBUNWIND_INSTALL_PATH} \
-        -DLIBUNWIND_ENABLE_SHARED=OFF \
+        -DLIBUNWIND_ENABLE_SHARED=ON \
         -DLLVM_PATH=../llvm \
         -DCMAKE_C_FLAGS="-fPIC" \
         -DCMAKE_CXX_FLAGS="-fPIC" \
