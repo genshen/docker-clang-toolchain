@@ -59,7 +59,8 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
         -DLIBCXX_ENABLE_SHARED=ON -DLIBCXX_ENABLE_STATIC=ON  \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
         -DLIBCXX_HAS_GCC_S_LIB=OFF \
-        -DCMAKE_SHARED_LINKER_FLAGS="-lunwind" \
+        -DLIBCXXABI_USE_COMPILER_RT=ON \
+        -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
         -DLIBCXX_CXX_ABI=libcxxabi \
         -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \
         -DLLVM_PATH=../llvm \
@@ -120,6 +121,7 @@ RUN cd ${LLVM_SRC_DIR}/libcxxabi \
     && cmake -B./build -H./ \
         -DCMAKE_INSTALL_PREFIX=${LIBCXXABI_INSTALL_PATH} \
         -DLIBCXXABI_ENABLE_STATIC=ON \
+        -DLIBCXXABI_USE_COMPILER_RT=ON \
         -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
         -DLIBCXXABI_LIBUNWIND_PATH=../libunwind \
         -DLIBCXXABI_LIBCXX_INCLUDES=../libcxx/include \
@@ -136,7 +138,8 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
         -DLIBCXX_ENABLE_SHARED=ON -DLIBCXX_ENABLE_STATIC=ON  \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
         -DLIBCXX_HAS_GCC_S_LIB=OFF \
-        -DCMAKE_SHARED_LINKER_FLAGS="-lunwind" \
+        -DLIBCXX_USE_COMPILER_RT=ON \
+        -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
         -DLIBCXX_CXX_ABI=libcxxabi \
         -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \
         -DLLVM_PATH=../llvm \
