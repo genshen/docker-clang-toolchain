@@ -1,27 +1,25 @@
 FROM alpine:3.13.5 AS builder_env
 
 ARG REQUIRE="build-base wget cmake python3 ninja linux-headers"
-ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/archive/llvmorg-11.1.0.tar.gz"
+ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/llvm-project-12.0.0.src.tar.xz"
 ENV LLVM_SRC_DIR=/llvm_src
 
 ## install packages and download source.
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories \
-    && apk add --no-cache ${REQUIRE}
-
-RUN wget ${LLVM_DOWNLOAD_URL} -O /tmp/llvmorg.tar.gz \
+RUN wget ${LLVM_DOWNLOAD_URL} -O /tmp/llvmorg.tar.xz \
     && mkdir -p ${LLVM_SRC_DIR} \
-    && tar -C ${LLVM_SRC_DIR} --strip-components 1 -zxf /tmp/llvmorg.tar.gz \
-    && rm /tmp/llvmorg.tar.gz
+    && tar -C ${LLVM_SRC_DIR} --strip-components 1 -Jxf /tmp/llvmorg.tar.xz \
+    && rm /tmp/llvmorg.tar.xz
 
+RUN apk add --no-cache ${REQUIRE}
 
 ## build clang with compiler-rt support
 # but clang/clang++ binary is still linked to GNU libs.
 FROM builder_env AS clang-gnu
 
-ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/11.1.0
-ENV LIBUNWIND_GNU_INSTALL_PATH=/usr/local/gun-libunwind
-ENV LIBCXXABI_GNU_INSTALL_PATH=/usr/local/gun-libcxxabi
-ENV LIBCXX_GNU_INSTALL_PATH=/usr/local/gun-libcxx
+ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/12.0.0
+ENV LIBUNWIND_GNU_INSTALL_PATH=/usr/local/gnu-libunwind
+ENV LIBCXXABI_GNU_INSTALL_PATH=/usr/local/gnu-libcxxabi
+ENV LIBCXX_GNU_INSTALL_PATH=/usr/local/gnu-libcxx
 
 RUN mkdir -p /usr/local/lib /usr/local/bin /usr/local/include
 
@@ -80,7 +78,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
         -DCOMPILER_RT_BUILD_PROFILE=OFF \
         -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
+        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DCLANG_DEFAULT_UNWINDLIB=libunwind \
         -DCLANG_DEFAULT_RTLIB=compiler-rt \
@@ -167,7 +165,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
         -DCOMPILER_RT_BUILD_PROFILE=ON \
         -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
+        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DCLANG_DEFAULT_UNWINDLIB=libunwind \
         -DCLANG_DEFAULT_RTLIB=compiler-rt \
