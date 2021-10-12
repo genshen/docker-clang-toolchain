@@ -101,6 +101,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
 ENV CC=${CLANG_GNU_INSTALL_PATH}/bin/clang
 ENV CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++
 RUN ln -s ${INSTALL_PREFIX}/bin/lld ${INSTALL_PREFIX}/bin/ld
+ENV CFLAGS="-O3 -flto"
+ENV CXXFLAGS="-O3 -flto"
+ENV LDFLAGS="-flto"
 
 
 # libcxx and libunwind support,
@@ -118,8 +121,9 @@ RUN cd ${LLVM_SRC_DIR}/libunwind \
         -DCMAKE_INSTALL_PREFIX=${LIBUNWIND_INSTALL_PATH} \
         -DLIBUNWIND_ENABLE_SHARED=ON \
         -DLLVM_PATH=../llvm \
-        -DCMAKE_C_FLAGS="-fPIC" \
-        -DCMAKE_CXX_FLAGS="-fPIC" \
+        -DCMAKE_C_FLAGS="${CFLAGS} -fPIC" \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS} -fPIC" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../  \
@@ -135,6 +139,9 @@ RUN cd ${LLVM_SRC_DIR}/libcxxabi \
         -DLIBCXXABI_LIBUNWIND_PATH=../libunwind \
         -DLIBCXXABI_LIBCXX_INCLUDES=../libcxx/include \
         -DLLVM_PATH=../llvm \
+        -DCMAKE_C_FLAGS="${CFLAGS}" \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../   \
@@ -152,6 +159,9 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
         -DLIBCXX_CXX_ABI=libcxxabi \
         -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \
         -DLLVM_PATH=../llvm \
+        -DCMAKE_C_FLAGS="${CFLAGS}" \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
     && cmake --build ./build --target install \
     && rm build -rf \
     && cd ../ \
@@ -182,6 +192,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_UNWINDLIB=libunwind \
         -DCLANG_DEFAULT_RTLIB=compiler-rt \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-pc-linux-musl  \
+        -DCMAKE_C_FLAGS="${CFLAGS}" \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
     && cmake --build ./llvm-build-with-compiler-rt --target install \
     && rm -rf llvm-build-with-compiler-rt
 
@@ -212,5 +225,11 @@ RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/inclu
     && ln -s ${INSTALL_PREFIX}/bin/lld                   ${INSTALL_PREFIX}/bin/ld \
     && apk add --no-cache libatomic linux-headers musl-dev binutils \
     && mkdir -p /project
+
+ENV CC=clang
+ENV CXX=clang++
+ENV CFLAGS=""
+ENV CXXFLAGS="-stdlib=libc++"
+ENV LDFLAGS="-stdlib=libc++ -lc++ -lc++abi"
 
 WORKDIR /project
