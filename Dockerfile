@@ -83,7 +83,7 @@ RUN cd ${LLVM_SRC_DIR}/libcxx \
 RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${CLANG_GNU_INSTALL_PATH} \
-        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
         -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
         -DCOMPILER_RT_BUILD_PROFILE=OFF \
@@ -97,9 +97,10 @@ RUN cd ${LLVM_SRC_DIR}/ \
     && cmake --build ./llvm-build-with-compiler-rt --target install \
     && rm llvm-build-with-compiler-rt -rf
 
-## set cc and cxx compiler.
+## set cc and cxx as compiler and lld as linker
 ENV CC=${CLANG_GNU_INSTALL_PATH}/bin/clang
 ENV CXX=${CLANG_GNU_INSTALL_PATH}/bin/clang++
+RUN ln -s ${INSTALL_PREFIX}/bin/lld ${INSTALL_PREFIX}/bin/ld
 
 
 # libcxx and libunwind support,
@@ -167,7 +168,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./llvm-build-with-compiler-rt -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_INSTALL_PREFIX=${CLANG_INSTALL_PATH} \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
-        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt;lld" \
         -DLLVM_BUILD_LLVM_DYLIB=ON \
         -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_ENABLE_LIBCXX=ON \
@@ -208,6 +209,7 @@ RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/inclu
     && ln -s ${LIBCXX_INSTALL_PATH}/lib/*                ${INSTALL_PREFIX}/lib/ \
     && ln -s ${LIBCXX_INSTALL_PATH}/include/*            ${INSTALL_PREFIX}/include/ \
     && ln -s ${CLANG_INSTALL_PATH}/bin/*                 ${INSTALL_PREFIX}/bin/  \
+    && ln -s ${INSTALL_PREFIX}/bin/lld                   ${INSTALL_PREFIX}/bin/ld \
     && apk add --no-cache libatomic linux-headers musl-dev binutils \
     && mkdir -p /project
 
