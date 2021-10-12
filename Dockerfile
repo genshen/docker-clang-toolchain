@@ -1,7 +1,9 @@
-FROM alpine:3.13.5 AS builder_env
+ARG ALPINE_VERSION=3.13.5
+ARG LLVM_VERSION=12.0.0
+FROM alpine:${ALPINE_VERSION} AS builder_env
 
 ARG REQUIRE="build-base wget cmake python3 ninja linux-headers"
-ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.0/llvm-project-12.0.0.src.tar.xz"
+ARG LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/llvm-project-${LLVM_VERSION}.src.tar.xz"
 ENV LLVM_SRC_DIR=/llvm_src
 
 ## install packages and download source.
@@ -16,7 +18,7 @@ RUN apk add --no-cache ${REQUIRE}
 # but clang/clang++ binary is still linked to GNU libs.
 FROM builder_env AS clang-gnu
 
-ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/12.0.0
+ENV CLANG_GNU_INSTALL_PATH=/usr/local/clang-gnu/${LLVM_VERSION}
 ENV LIBUNWIND_GNU_INSTALL_PATH=/usr/local/gnu-libunwind
 ENV LIBCXXABI_GNU_INSTALL_PATH=/usr/local/gnu-libcxxabi
 ENV LIBCXX_GNU_INSTALL_PATH=/usr/local/gnu-libcxx
@@ -175,7 +177,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
     && cmake --build ./llvm-build-with-compiler-rt --target install \
     && rm -rf llvm-build-with-compiler-rt
 
-FROM alpine:3.13.5 AS clang-toolchain
+FROM alpine:${ALPINE_VERSION} AS clang-toolchain
 
 LABEL maintainer="genshen genshenchu@gmail.com" \
     description="clang/clang++ toolchain without gnu."
