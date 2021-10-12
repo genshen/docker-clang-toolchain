@@ -8,10 +8,12 @@ not glibc、libstdc++ and libgcc in GNU C/C++ compiler.
 
 ## Build
 ```bash
-docker build --rm=true -t genshen/clang-toolchain:12.0.0 .
+docker build --rm=true -t genshen/clang-toolchain:latest .
 ```
 
 ## Usage
+
+### Dynamic Linking
 ```bash
 docker run -it --rm -v ${PWD}:/project genshen/clang-toolchain:latest clang++ main.cpp -o a.out # compile
 docker run -it --rm -v ${PWD}:/project genshen/clang-toolchain:latest ./a.out # run
@@ -22,7 +24,7 @@ docker run -it --rm -v ${PWD}:/project genshen/clang-toolchain:latest ldd ./a.ou
 	libc.musl-x86_64.so.1 => /lib/ld-musl-x86_64.so.1 (0x7fc960e6f000)
 ```
 
-### static link
+### Static Linking
 ```bash
-clang++ main.cpp -static -lc++ -lc++abi -o main
+docker run -it --rm -v ${PWD}:/project genshen/clang-toolchain:latest clang++ main.cpp -static -lc++ -lc++abi -o main
 ```
