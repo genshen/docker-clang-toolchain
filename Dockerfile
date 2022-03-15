@@ -114,7 +114,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-alpine-linux-musl  \
         -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DLLVM_DISTRIBUTION_COMPONENTS="clang;LTO;clang-format;lld;builtins;runtimes" \
+        -DLLVM_DISTRIBUTION_COMPONENTS="clang;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
     && cmake --build ./build --target install-distribution \
     && rm -rf build
 
