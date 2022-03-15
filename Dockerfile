@@ -66,10 +66,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
 
 # build and link clang+lld with llvm toolchain
 # NOTE link jobs with LTO can use more than 10GB each!
-# TODO add lldb debugger, fix problem of not finding execinfo.h
-# TODO add fuzzer/sanitizer/profiler runtimes, fix build problem of not finding execinfo.h
-#   check check_symbol_exists(__GLIBC__ stdio.h LLVM_USING_GLIBC) in llvm/cmake/config-ix.cmake
-#   checks for __GLIBC__ defined when including stdio.h -> might not work correctly with musl OR with LLVM_ENABLE_LIBCXX=ON
+# NOTE execinfo.h not available on musl -> lldb and compiler-rt:fuzzer/sanitizer/profiler cannot be built!
 ARG LLVM_INSTALL_PATH
 ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -Wno-unused-command-line-argument"
 RUN cd ${LLVM_SRC_DIR}/ \
