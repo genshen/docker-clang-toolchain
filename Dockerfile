@@ -66,10 +66,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
 
 # build and link clang+lld with llvm toolchain
 # NOTE link jobs with LTO can use more than 10GB each!
-# TODO add lldb debugger, fix problem of not finding execinfo.h
-# TODO add fuzzer/sanitizer/profiler runtimes, fix build problem of not finding execinfo.h
-#   check check_symbol_exists(__GLIBC__ stdio.h LLVM_USING_GLIBC) in llvm/cmake/config-ix.cmake
-#   checks for __GLIBC__ defined when including stdio.h -> might not work correctly with musl OR with LLVM_ENABLE_LIBCXX=ON
+# NOTE execinfo.h not available on musl -> lldb and compiler-rt:fuzzer/sanitizer/profiler cannot be built!
 ARG LLVM_INSTALL_PATH
 ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -Wno-unused-command-line-argument"
 RUN cd ${LLVM_SRC_DIR}/ \
@@ -114,7 +111,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-alpine-linux-musl  \
         -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DLLVM_DISTRIBUTION_COMPONENTS="clang;LTO;clang-format;lld;builtins;runtimes" \
+        -DLLVM_DISTRIBUTION_COMPONENTS="clang;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
     && cmake --build ./build --target install-distribution \
     && rm -rf build
 
