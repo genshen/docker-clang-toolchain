@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.14.2
-ARG LLVM_VERSION=13.0.0
+ARG ALPINE_VERSION=3.15
+ARG LLVM_VERSION=14.0.0
 ARG INSTALL_PREFIX=/usr/local
 ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
 
@@ -14,10 +14,11 @@ ENV LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/releases/download/ll
 ENV LLVM_SRC_DIR=/llvm_src
 RUN mkdir -p ${LLVM_SRC_DIR} \
     && curl -L ${LLVM_DOWNLOAD_URL} | tar Jx --strip-components 1 -C ${LLVM_SRC_DIR}
+
 # patch sources (it is also stored in patch directory)
-# see discussion in: https://github.com/llvm/llvm-project/issues/51425#issuecomment-1100871746
-# TODO are they upstreamed in 13.0.1?
-RUN curl -L https://github.com/llvm/llvm-project/compare/llvmorg-13.0.0...emacski:13.0.0-debian-patches.diff | patch -ruN --strip=1 -d /llvm_src
+# see discussion in: https://github.com/llvm/llvm-project/issues/51425
+# NOTE patch from https://github.com/emacski/llvm-project/tree/13.0.0-debian-patches
+RUN curl -L https://github.com/emacski/llvm-project/commit/2fd6a43c9adf6f05936e59a379de236b5d8885b6.diff | patch -ruN --strip=1 -d /llvm_src
 
 # documentation: https://llvm.org/docs/BuildingADistribution.html
 
