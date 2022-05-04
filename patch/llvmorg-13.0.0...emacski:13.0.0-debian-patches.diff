@@ -1,0 +1,267 @@
+diff --git a/clang/CMakeLists.txt b/clang/CMakeLists.txt
+index 95cdbd8f6663a..573b2e4253344 100644
+--- a/clang/CMakeLists.txt
++++ b/clang/CMakeLists.txt
+@@ -710,9 +710,7 @@ if (CLANG_ENABLE_BOOTSTRAP)
+     CMAKE_C_COMPILER_LAUNCHER
+     CMAKE_CXX_COMPILER_LAUNCHER
+     CMAKE_MAKE_PROGRAM
+-    CMAKE_OSX_ARCHITECTURES
+-    LLVM_ENABLE_PROJECTS
+-    LLVM_ENABLE_RUNTIMES)
++    CMAKE_OSX_ARCHITECTURES)
+ 
+   # We don't need to depend on compiler-rt/libcxx if we're building instrumented
+   # because the next stage will use the same compiler used to build this stage.
+diff --git a/compiler-rt/cmake/Modules/CompilerRTUtils.cmake b/compiler-rt/cmake/Modules/CompilerRTUtils.cmake
+index 5543e3c6afc62..8cc8d5b8fa482 100644
+--- a/compiler-rt/cmake/Modules/CompilerRTUtils.cmake
++++ b/compiler-rt/cmake/Modules/CompilerRTUtils.cmake
+@@ -323,15 +323,15 @@ macro(load_llvm_config)
+ 
+     # Detect if we have the LLVMXRay and TestingSupport library installed and
+     # available from llvm-config.
++    set(COMPILER_RT_HAS_LLVMXRAY FALSE)
+     execute_process(
+       COMMAND ${LLVM_CONFIG_PATH} "--ldflags" "--libs" "xray"
+       RESULT_VARIABLE HAD_ERROR
+       OUTPUT_VARIABLE CONFIG_OUTPUT
+       ERROR_QUIET)
+-    if (HAD_ERROR)
++    if (HAD_ERROR AND COMPILER_RT_BUILD_XRAY)
+       message(WARNING "llvm-config finding xray failed with status ${HAD_ERROR}")
+-      set(COMPILER_RT_HAS_LLVMXRAY FALSE)
+-    else()
++    elseif(COMPILER_RT_BUILD_XRAY)
+       string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";" CONFIG_OUTPUT ${CONFIG_OUTPUT})
+       list(GET CONFIG_OUTPUT 0 LDFLAGS)
+       list(GET CONFIG_OUTPUT 1 LIBLIST)
+@@ -348,7 +348,7 @@ macro(load_llvm_config)
+       RESULT_VARIABLE HAD_ERROR
+       OUTPUT_VARIABLE CONFIG_OUTPUT
+       ERROR_QUIET)
+-    if (HAD_ERROR)
++    if (HAD_ERROR AND COMPILER_RT_INCLUDE_TESTS)
+       message(WARNING "llvm-config finding testingsupport failed with status ${HAD_ERROR}")
+     elseif(COMPILER_RT_INCLUDE_TESTS)
+       string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";" CONFIG_OUTPUT ${CONFIG_OUTPUT})
+diff --git a/libcxx/CMakeLists.txt b/libcxx/CMakeLists.txt
+index b1e25358d41a3..73ead40230571 100644
+--- a/libcxx/CMakeLists.txt
++++ b/libcxx/CMakeLists.txt
+@@ -793,12 +793,14 @@ function(cxx_link_system_libraries target)
+     endif()
+   elseif (LIBCXX_HAS_GCC_LIB)
+     target_link_libraries(${target} PRIVATE gcc)
++    if (LIBCXX_HAS_ATOMIC_LIB)
++      target_link_libraries(${target} PRIVATE atomic)
++    endif()
+   elseif (LIBCXX_HAS_GCC_S_LIB)
+     target_link_libraries(${target} PRIVATE gcc_s)
+-  endif()
+-
+-  if (LIBCXX_HAS_ATOMIC_LIB)
+-    target_link_libraries(${target} PRIVATE atomic)
++    if (LIBCXX_HAS_ATOMIC_LIB)
++      target_link_libraries(${target} PRIVATE atomic)
++    endif()
+   endif()
+ 
+   if (MINGW)
+diff --git a/llvm/cmake/modules/AddLLVM.cmake b/llvm/cmake/modules/AddLLVM.cmake
+index 29e40f45fef89..25c47fc0be438 100644
+--- a/llvm/cmake/modules/AddLLVM.cmake
++++ b/llvm/cmake/modules/AddLLVM.cmake
+@@ -197,7 +197,7 @@ if (NOT DEFINED LLVM_LINKER_DETECTED)
+       set(LLVM_LINKER_DETECTED YES CACHE INTERNAL "")
+       set(LLVM_LINKER_IS_GOLD YES CACHE INTERNAL "")
+       message(STATUS "Linker detection: GNU Gold")
+-    elseif("${stdout}" MATCHES "^LLD")
++    elseif("${stdout}" MATCHES "LLD")
+       set(LLVM_LINKER_DETECTED YES CACHE INTERNAL "")
+       set(LLVM_LINKER_IS_LLD YES CACHE INTERNAL "")
+       message(STATUS "Linker detection: LLD")
+diff --git a/llvm/runtimes/CMakeLists.txt b/llvm/runtimes/CMakeLists.txt
+index 3436cd8bdfbef..d04960fc32f1a 100644
+--- a/llvm/runtimes/CMakeLists.txt
++++ b/llvm/runtimes/CMakeLists.txt
+@@ -233,6 +233,7 @@ function(runtime_default_target)
+                                       -DLLVM_ENABLE_PROJECTS_USED=${LLVM_ENABLE_PROJECTS_USED}
+                                       -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=${LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default}
+                                       -DLLVM_BUILD_TOOLS=${LLVM_BUILD_TOOLS}
++                                      -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
+                                       -DCMAKE_C_COMPILER_WORKS=ON
+                                       -DCMAKE_CXX_COMPILER_WORKS=ON
+                                       -DCMAKE_ASM_COMPILER_WORKS=ON
+@@ -448,7 +449,7 @@ if(runtimes)
+     # build directory cannot find the C++ headers in certain configurations.
+     # I need to build a mechanism for runtime projects to provide CMake code
+     # that executes at LLVM configuration time to handle this case.
+-    add_dependencies(clang-bootstrap-deps runtimes-configure)
++    #add_dependencies(clang-bootstrap-deps runtimes-configure)
+     # We need to add the runtimes as a dependency because compiler-rt can be
+     # built as part of runtimes and we need the profile runtime for PGO
+     add_dependencies(clang-bootstrap-deps runtimes)
+diff --git a/openmp/CMakeLists.txt b/openmp/CMakeLists.txt
+index 45c400351f32e..acbcffce2fd8d 100644
+--- a/openmp/CMakeLists.txt
++++ b/openmp/CMakeLists.txt
+@@ -67,6 +67,28 @@ option(OPENMP_ENABLE_LIBOMPTARGET_PROFILING "Enable time profiling for libomptar
+        ${ENABLE_LIBOMPTARGET})
+ option(OPENMP_ENABLE_LIBOMP_PROFILING "Enable time profiling for libomp." OFF)
+ 
++option(OPENMP_USE_LLVM_UNWINDER "Build and use the LLVM unwinder" OFF)
++
++option(LIBOMP_ENABLE_RTTI "Enabling RTTI forces libomp to be a c++ lib" ${LLVM_ENABLE_RTTI})
++
++macro(add_runtimes_build_depends_if_needed target)
++  if(LLVM_RUNTIMES_BUILD)
++    # required for rtti and libomp/libomptarget profiling if enabled
++    add_dependencies(${target} cxx-headers cxxabi_static cxx_static cxxabi_shared cxx_shared)
++    if(OPENMP_USE_LLVM_UNWINDER AND (NOT target STREQUAL "omp" AND NOT LIBOMP_ENABLE_RTTI))
++      add_dependencies(${target} unwind_static unwind_shared)
++      get_target_property(target_link_flags ${target} LINK_FLAGS)
++      set(runtimes_link_flags "-lunwind")
++      if(target_link_flags)
++        set(runtimes_link_flags "${target_link_flags} -lunwind")
++      endif()
++      set_target_properties(${target}
++        PROPERTIES
++        LINK_FLAGS "${runtimes_link_flags}")
++    endif()
++  endif()
++endmacro()
++
+ # Build host runtime library, after LIBOMPTARGET variables are set since they are needed
+ # to enable time profiling support in the OpenMP runtime.
+ add_subdirectory(runtime)
+diff --git a/openmp/libomptarget/plugins/CMakeLists.txt b/openmp/libomptarget/plugins/CMakeLists.txt
+index ac156785c9a0f..5a49bdf17429a 100644
+--- a/openmp/libomptarget/plugins/CMakeLists.txt
++++ b/openmp/libomptarget/plugins/CMakeLists.txt
+@@ -36,6 +36,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "${tmachine}$")
+       add_library("omptarget.rtl.${tmachine_libname}" SHARED
+         ${CMAKE_CURRENT_SOURCE_DIR}/../generic-elf-64bit/src/rtl.cpp)
+ 
++      add_runtimes_build_depends_if_needed("omptarget.rtl.${tmachine_libname}")
++
+       # Install plugin under the lib destination folder.
+       install(TARGETS "omptarget.rtl.${tmachine_libname}"
+         LIBRARY DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+diff --git a/openmp/libomptarget/plugins/cuda/CMakeLists.txt b/openmp/libomptarget/plugins/cuda/CMakeLists.txt
+index 7f77bcc364f52..e240bd401d82b 100644
+--- a/openmp/libomptarget/plugins/cuda/CMakeLists.txt
++++ b/openmp/libomptarget/plugins/cuda/CMakeLists.txt
+@@ -44,6 +44,8 @@ else()
+   set (LIBOMPTARGET_DEP_LIBRARIES ${CMAKE_DL_LIBS})
+ endif()
+ 
++add_runtimes_build_depends_if_needed(omptarget.rtl.cuda)
++
+ # Install plugin under the lib destination folder.
+ install(TARGETS omptarget.rtl.cuda LIBRARY DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+ 
+diff --git a/openmp/libomptarget/src/CMakeLists.txt b/openmp/libomptarget/src/CMakeLists.txt
+index 46387e203bd06..3546899e4acc8 100644
+--- a/openmp/libomptarget/src/CMakeLists.txt
++++ b/openmp/libomptarget/src/CMakeLists.txt
+@@ -38,6 +38,8 @@ target_link_libraries(omptarget PRIVATE
+   ${CMAKE_DL_LIBS}
+   "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
+ 
++add_runtimes_build_depends_if_needed(omptarget)
++
+ # Install libomptarget under the lib destination folder.
+ install(TARGETS omptarget LIBRARY COMPONENT omptarget
+   DESTINATION "${OPENMP_INSTALL_LIBDIR}")
+diff --git a/openmp/runtime/CMakeLists.txt b/openmp/runtime/CMakeLists.txt
+index 7080f92495b8a..5872774003bcc 100644
+--- a/openmp/runtime/CMakeLists.txt
++++ b/openmp/runtime/CMakeLists.txt
+@@ -287,6 +287,10 @@ if(LIBOMP_STATS)
+   set(LIBOMP_USE_STDCPPLIB TRUE)
+ endif()
+ 
++if(LIBOMP_ENABLE_RTTI)
++  set(LIBOMP_USE_STDCPPLIB TRUE)
++endif()
++
+ # Shared library can be switched to a static library
+ set(LIBOMP_ENABLE_SHARED TRUE CACHE BOOL
+   "Shared library instead of static library?")
+@@ -366,7 +370,8 @@ else()
+   set(LIBOMP_INSTALL_KIND ARCHIVE)
+ endif()
+ 
+-set(LIBOMP_LIB_FILE ${LIBOMP_LIB_NAME}${LIBOMP_LIBRARY_SUFFIX})
++set(LIBOMP_LIB_FILE ${LIBOMP_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}.${LIBOMP_VERSION_MAJOR})
++
+ 
+ # Optional backwards compatibility aliases.
+ set(LIBOMP_INSTALL_ALIASES TRUE CACHE BOOL
+diff --git a/openmp/runtime/cmake/LibompCheckLinkerFlag.cmake b/openmp/runtime/cmake/LibompCheckLinkerFlag.cmake
+index e601e53f11237..b7c771c0ec175 100644
+--- a/openmp/runtime/cmake/LibompCheckLinkerFlag.cmake
++++ b/openmp/runtime/cmake/LibompCheckLinkerFlag.cmake
+@@ -21,7 +21,7 @@ function(libomp_check_linker_flag flag boolean)
+      project(foo C)
+      set(CMAKE_SHARED_LINKER_FLAGS \"${flag}\")
+      add_library(foo SHARED src_to_link.c)")
+-  set(failed_regexes "[Ee]rror;[Uu]nknown;[Ss]kipping;LINK : warning")
++  set(failed_regexes "[Ee]rror;[Uu]nknown;[Ss]kipping;LINK : warning;warning: argument")
+   set(base_dir ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/link_flag_check_${boolean})
+   file(MAKE_DIRECTORY ${base_dir})
+   file(MAKE_DIRECTORY ${base_dir}/build)
+diff --git a/openmp/runtime/src/CMakeLists.txt b/openmp/runtime/src/CMakeLists.txt
+index bdb867e352f78..5a713c4996091 100644
+--- a/openmp/runtime/src/CMakeLists.txt
++++ b/openmp/runtime/src/CMakeLists.txt
+@@ -136,6 +136,7 @@ endif()
+ if(NOT ${LIBOMP_USE_STDCPPLIB})
+   set(LIBOMP_LINKER_LANGUAGE C)
+   set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+ else()
+   set(LIBOMP_LINKER_LANGUAGE CXX)
+ endif()
+@@ -164,6 +165,8 @@ set_target_properties(omp PROPERTIES
+   LINKER_LANGUAGE ${LIBOMP_LINKER_LANGUAGE}
+ )
+ 
++add_runtimes_build_depends_if_needed(omp)
++
+ # Get the library's location within the build tree for the unit tester
+ if(NOT WIN32)
+   get_target_property(LIBOMP_LIBRARY_DIR omp LIBRARY_OUTPUT_DIRECTORY)
+@@ -181,6 +184,8 @@ set(LIBOMP_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
+ # Add symbolic links to libomp
+ if(NOT WIN32)
+   add_custom_command(TARGET omp POST_BUILD
++    COMMAND ${CMAKE_COMMAND} -E create_symlink ${LIBOMP_LIB_FILE}
++      libomp${LIBOMP_LIBRARY_SUFFIX}
+     COMMAND ${CMAKE_COMMAND} -E create_symlink ${LIBOMP_LIB_FILE}
+       libgomp${LIBOMP_LIBRARY_SUFFIX}
+     COMMAND ${CMAKE_COMMAND} -E create_symlink ${LIBOMP_LIB_FILE}
+@@ -331,7 +336,7 @@ else()
+ 
+   if(${LIBOMP_INSTALL_ALIASES})
+     # Create aliases (symlinks) of the library for backwards compatibility
+-    set(LIBOMP_ALIASES "libgomp;libiomp5")
++    set(LIBOMP_ALIASES "libomp;libgomp;libiomp5")
+     foreach(alias IN LISTS LIBOMP_ALIASES)
+       install(CODE "execute_process(COMMAND \"\${CMAKE_COMMAND}\" -E create_symlink \"${LIBOMP_LIB_FILE}\"
+         \"${alias}${LIBOMP_LIBRARY_SUFFIX}\" WORKING_DIRECTORY
+diff --git a/openmp/tools/archer/CMakeLists.txt b/openmp/tools/archer/CMakeLists.txt
+index 85405affe8f1a..97715b2e2c255 100644
+--- a/openmp/tools/archer/CMakeLists.txt
++++ b/openmp/tools/archer/CMakeLists.txt
+@@ -14,6 +14,9 @@ if(LIBOMP_OMPT_SUPPORT)
+   add_library(archer SHARED ompt-tsan.cpp)
+   add_library(archer_static STATIC ompt-tsan.cpp)
+ 
++  add_runtimes_build_depends_if_needed(archer)
++  add_runtimes_build_depends_if_needed(archer_static)
++
+   install(TARGETS archer archer_static
+     LIBRARY DESTINATION ${OPENMP_INSTALL_LIBDIR}
+     ARCHIVE DESTINATION ${OPENMP_INSTALL_LIBDIR})
