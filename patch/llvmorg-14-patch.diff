@@ -1,0 +1,23 @@
+diff --git a/libcxx/CMakeLists.txt b/libcxx/CMakeLists.txt
+index b1e25358d41a3..73ead40230571 100644
+--- a/libcxx/CMakeLists.txt
++++ b/libcxx/CMakeLists.txt
+@@ -793,12 +793,14 @@ function(cxx_link_system_libraries target)
+     endif()
+   elseif (LIBCXX_HAS_GCC_LIB)
+     target_link_libraries(${target} PRIVATE gcc)
++    if (LIBCXX_HAS_ATOMIC_LIB)
++      target_link_libraries(${target} PRIVATE atomic)
++    endif()
+   elseif (LIBCXX_HAS_GCC_S_LIB)
+     target_link_libraries(${target} PRIVATE gcc_s)
+-  endif()
+-
+-  if (LIBCXX_HAS_ATOMIC_LIB)
+-    target_link_libraries(${target} PRIVATE atomic)
++    if (LIBCXX_HAS_ATOMIC_LIB)
++      target_link_libraries(${target} PRIVATE atomic)
++    endif()
+   endif()
+ 
+   if (MINGW)
