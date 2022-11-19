@@ -6,7 +6,7 @@ ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
 FROM alpine:${ALPINE_VERSION} AS builder
 
 # install prerequisites
-RUN apk add --no-cache build-base cmake curl git linux-headers ninja python3 wget zlib-dev
+RUN apk add --no-cache build-base cmake curl git libexecinfo-dev linux-headers ninja python3 wget zlib-dev
 
 # download sources
 ARG LLVM_VERSION
@@ -68,9 +68,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
 
 # build and link clang+lld with llvm toolchain
 # NOTE link jobs with LTO can use more than 10GB each!
-# NOTE execinfo.h not available on musl -> lldb and compiler-rt:fuzzer/sanitizer/profiler cannot be built!
+# NOTE: libexecinfo is needed for lldb and compiler-rt:fuzzer/sanitizer/profiler 
 ARG LLVM_INSTALL_PATH
-ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -Wno-unused-command-line-argument"
+ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -lexecinfo -Wno-unused-command-line-argument"
 RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./build -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_C_COMPILER=clang \
@@ -94,10 +94,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DLLVM_ENABLE_ZLIB=ON \
         -DCOMPILER_RT_BUILD_BUILTINS=ON \
         -DCOMPILER_RT_BUILD_CRT=ON \
-        -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
-        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-        -DCOMPILER_RT_BUILD_PROFILE=OFF \
         -DCOMPILER_RT_BUILD_MEMPROF=OFF \
         -DCOMPILER_RT_BUILD_ORC=OFF \
         -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
@@ -129,7 +126,7 @@ RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/inclu
     && ln -s ${LLVM_INSTALL_PATH}/bin/*       ${INSTALL_PREFIX}/bin/ \
     && ln -s ${LLVM_INSTALL_PATH}/lib/*       ${INSTALL_PREFIX}/lib/ \
     && ln -s ${LLVM_INSTALL_PATH}/include/c++ ${INSTALL_PREFIX}/include/
-RUN apk add --no-cache binutils linux-headers musl-dev zlib
+RUN apk add --no-cache binutils libexecinfo linux-headers musl-dev zlib
 
 # set llvm toolchain as default
 ENV CC=clang
