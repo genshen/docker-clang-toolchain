@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.15
-ARG LLVM_VERSION=14.0.6
+ARG ALPINE_VERSION=3.18
+ARG LLVM_VERSION=16.0.3
 ARG PARALLEL_LINK=4
 ARG INSTALL_PREFIX=/usr/local
 ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
@@ -7,7 +7,7 @@ ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
 FROM alpine:${ALPINE_VERSION} AS builder
 
 # install prerequisites
-RUN apk add --no-cache build-base cmake curl git libexecinfo-dev linux-headers ninja python3 wget zlib-dev
+RUN apk add --no-cache build-base cmake curl git linux-headers ninja python3 wget zlib-dev
 
 # download sources
 ARG LLVM_VERSION
@@ -15,11 +15,6 @@ ENV LLVM_DOWNLOAD_URL="https://github.com/llvm/llvm-project/releases/download/ll
 ENV LLVM_SRC_DIR=/llvm_src
 RUN mkdir -p ${LLVM_SRC_DIR} \
     && curl -L ${LLVM_DOWNLOAD_URL} | tar Jx --strip-components 1 -C ${LLVM_SRC_DIR}
-
-# patch sources (it is also stored in patch directory)
-# see discussion in: https://github.com/llvm/llvm-project/issues/51425
-# NOTE patch from https://github.com/emacski/llvm-project/tree/13.0.0-debian-patches
-RUN curl -L https://github.com/emacski/llvm-project/commit/2fd6a43c9adf6f05936e59a379de236b5d8885b6.diff | patch -ruN --strip=1 -d /llvm_src
 
 # documentation: https://llvm.org/docs/BuildingADistribution.html
 
@@ -70,9 +65,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
 
 # build and link clang+lld with llvm toolchain
 # NOTE link jobs with LTO can use more than 10GB each!
-# NOTE: libexecinfo is needed for lldb and compiler-rt:fuzzer/sanitizer/profiler 
+# NOTE: DCOMPILER_RT_BUILD_GWP_ASAN=OFF is needed to avoid depending on libexecinfo
 ARG LLVM_INSTALL_PATH
-ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -lexecinfo -Wno-unused-command-line-argument"
+ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -Wno-unused-command-line-argument"
 RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./build -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DBUILTINS_CMAKE_ARGS="-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF;-DCMAKE_SHARED_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_MODULE_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_EXE_LINKER_FLAGS='${LDFLAGS}'" \
@@ -88,6 +83,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS}" \
         -DCOMPILER_RT_BUILD_BUILTINS=ON \
         -DCOMPILER_RT_BUILD_CRT=ON \
+        -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
         -DCOMPILER_RT_BUILD_MEMPROF=OFF \
         -DCOMPILER_RT_BUILD_ORC=OFF \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
@@ -95,6 +91,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
         -DLIBCXXABI_USE_COMPILER_RT=ON \
         -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+        -DLIBCXX_HAS_ATOMIC_LIB=OFF \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
         -DLIBCXX_USE_COMPILER_RT=ON \
         -DLIBUNWIND_USE_COMPILER_RT=ON \
@@ -128,7 +125,7 @@ RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/inclu
     && ln -s ${LLVM_INSTALL_PATH}/bin/*       ${INSTALL_PREFIX}/bin/ \
     && ln -s ${LLVM_INSTALL_PATH}/lib/*       ${INSTALL_PREFIX}/lib/ \
     && ln -s ${LLVM_INSTALL_PATH}/include/c++ ${INSTALL_PREFIX}/include/
-RUN apk add --no-cache binutils libexecinfo linux-headers musl-dev zlib
+RUN apk add --no-cache binutils linux-headers musl-dev zlib
 
 # set llvm toolchain as default
 ENV CC=clang
